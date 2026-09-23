@@ -182,6 +182,10 @@
   .legend span { display: inline-flex; align-items: center; gap: 5px; }
   .legend i { width: 11px; height: 11px; border-radius: 50%; display: inline-block; }
 
+  .sides-fields { display: flex; flex-wrap: wrap; gap: 8px; flex: 1 1 100%; }
+  .settings-row { display: flex; align-items: center; gap: 8px; margin: 0 0 14px 2px; }
+  .settings-row label.check { color: var(--ink-soft); }
+
   footer.hint { text-align: center; color: var(--ink-soft); font-size: 12px; padding: 30px 20px 40px; }
 
   @media print {
@@ -215,9 +219,15 @@
           <option value="rectangular">Rectangular</option>
           <option value="square">Square</option>
         </select>
-        <div class="num-field">
+        <div class="num-field" id="totalSeatsField">
           <span>seats</span>
           <input type="number" id="tableSeats" min="2" max="50" value="8">
+        </div>
+        <div class="sides-fields" id="sidesFields" style="display:none">
+          <div class="num-field"><span>top</span><input type="number" id="sideTop" min="0" max="25" value="0"></div>
+          <div class="num-field"><span>right</span><input type="number" id="sideRight" min="0" max="25" value="0"></div>
+          <div class="num-field"><span>bottom</span><input type="number" id="sideBottom" min="0" max="25" value="0"></div>
+          <div class="num-field"><span>left</span><input type="number" id="sideLeft" min="0" max="25" value="0"></div>
         </div>
         <button type="submit">Add table</button>
         <button type="button" class="ghost small" id="tableCancelBtn" style="display:none" data-action="cancel-edit-table">Cancel</button>
@@ -238,6 +248,9 @@
 
     <section class="panel">
       <h2>Seating preferences <span class="count" id="prefCount"></span></h2>
+      <div class="settings-row">
+        <label class="check"><input type="checkbox" id="cornerToggle"> corner seats count as "next to"</label>
+      </div>
       <form class="inline-form" id="prefForm">
         <select id="prefA"></select>
         <select id="prefType">
@@ -299,9 +312,10 @@
         <span><i style="background:var(--brass)"></i> adult, seated</span>
         <span><i style="background:var(--sage)"></i> child, seated</span>
         <span><i style="background:var(--seat-empty);border:1.5px solid var(--line)"></i> open seat</span>
+        <span><i style="background:repeating-linear-gradient(45deg, var(--ink-soft), var(--ink-soft) 2px, transparent 2px, transparent 4px)"></i> blocked seat</span>
         <span>The dashed ring marks each table's head seat.</span>
         <span>A thicker outline means you placed that guest by hand — Rearrange won't move them.</span>
-        <span>Drag a name onto a seat, or tap one then tap where it should go.</span>
+        <span>Drag a name onto a seat, or tap one then tap where it should go. Tap an empty seat's ✕ to block it off.</span>
       </div>
       <div class="tray" id="trayList"></div>
     </section>
@@ -333,8 +347,17 @@
     return arr;
   }
 
+  function defaultSides(shape, seats){
+    if(shape === "square"){
+      var per = Math.ceil(seats/4), rem = seats - per*3;
+      return [per, per, per, Math.max(0, rem)];
+    }
+    var half = Math.ceil(seats/2);
+    return [half, 0, seats-half, 0];
+  }
+
   function defaultState(){
-    var t1 = {id: uid("t"), name: "Head table", shape: "rectangular", seats: 6};
+    var t1 = {id: uid("t"), name: "Head table", shape: "rectangular", seats: 6, sides: defaultSides("rectangular", 6)};
     var t2 = {id: uid("t"), name: "Table 2", shape: "round", seats: 8};
     var g = function(name, kid){ return {id: uid("g"), name: name, kid: !!kid}; };
     var guests = [
@@ -351,7 +374,10 @@
     var assignment = {};
     assignment[t1.id] = new Array(t1.seats).fill(null);
     assignment[t2.id] = new Array(t2.seats).fill(null);
-    return { tables: [t1, t2], guests: guests, prefs: prefs, assignment: assignment, locked: {} };
+    var blocked = {};
+    blocked[t1.id] = new Array(t1.seats).fill(false);
+    blocked[t2.id] = new Array(t2.seats).fill(false);
+    return { tables: [t1, t2], guests: guests, prefs: prefs, assignment: assignment, locked: {}, blocked: blocked, cornersAdjacent: false };
   }
 
   function saveState(){
@@ -368,11 +394,18 @@
       if(!parsed.prefs) parsed.prefs = [];
       if(!parsed.assignment) parsed.assignment = {};
       if(!parsed.locked) parsed.locked = {};
+      if(!parsed.blocked) parsed.blocked = {};
+      if(typeof parsed.cornersAdjacent !== "boolean") parsed.cornersAdjacent = false;
       parsed.tables.forEach(function(t){
         if(!parsed.assignment[t.id]) parsed.assignment[t.id] = new Array(t.seats).fill(null);
         var arr = parsed.assignment[t.id];
         if(arr.length < t.seats){ while(arr.length < t.seats) arr.push(null); }
         else if(arr.length > t.seats){ parsed.assignment[t.id] = arr.slice(0, t.seats); }
+        if(!parsed.blocked[t.id]) parsed.blocked[t.id] = new Array(t.seats).fill(false);
+        var barr = parsed.blocked[t.id];
+        if(barr.length < t.seats){ while(barr.length < t.seats) barr.push(false); }
+        else if(barr.length > t.seats){ parsed.blocked[t.id] = barr.slice(0, t.seats); }
+        if(!t.sides || t.sides.length !== 4) t.sides = defaultSides(t.shape, t.seats);
       });
       return parsed;
     } catch(e){ return null; }
@@ -389,30 +422,66 @@
   }
 
   // ---------- mutations: tables ----------
-  function addTable(name, shape, seats){
-    seats = Math.max(2, Math.min(50, seats));
-    var t = {id: uid("t"), name: name || ("Table " + (state.tables.length+1)), shape: shape, seats: seats};
+  function addTable(name, shape, seats, sides){
+    var t;
+    if(shape === "round"){
+      seats = Math.max(2, Math.min(50, seats));
+      t = {id: uid("t"), name: name || ("Table " + (state.tables.length+1)), shape: shape, seats: seats};
+    } else {
+      sides = normalizeSides(sides, shape);
+      seats = sides.reduce(function(a,b){ return a+b; }, 0);
+      t = {id: uid("t"), name: name || ("Table " + (state.tables.length+1)), shape: shape, seats: seats, sides: sides};
+    }
     state.tables.push(t);
     state.assignment[t.id] = new Array(seats).fill(null);
+    state.blocked[t.id] = new Array(seats).fill(false);
     saveState(); render();
   }
-  function updateTable(id, name, shape, seats){
+  function normalizeSides(sides, shape){
+    sides = (sides || [0,0,0,0]).map(function(n){ return Math.max(0, Math.min(25, parseInt(n,10)||0)); });
+    var total = sides.reduce(function(a,b){ return a+b; }, 0);
+    if(total < 2){ sides = defaultSides(shape, 8); }
+    return sides;
+  }
+  function updateTable(id, name, shape, seats, sides){
     var t = tableById(id);
     if(!t) return;
-    seats = Math.max(2, Math.min(50, seats));
+    var oldSeats = t.seats;
+    if(shape === "round"){
+      seats = Math.max(2, Math.min(50, seats));
+      delete t.sides;
+    } else {
+      sides = normalizeSides(sides, shape);
+      seats = sides.reduce(function(a,b){ return a+b; }, 0);
+      t.sides = sides;
+    }
     t.name = name || t.name;
     t.shape = shape;
     var arr = state.assignment[id] || [];
     if(seats > arr.length){ while(arr.length < seats) arr.push(null); }
     else if(seats < arr.length){ arr = arr.slice(0, seats); }
     state.assignment[id] = arr;
+    var barr = state.blocked[id] || [];
+    if(seats > barr.length){ while(barr.length < seats) barr.push(false); }
+    else if(seats < barr.length){ barr = barr.slice(0, seats); }
+    state.blocked[id] = barr;
     t.seats = seats;
     saveState(); render();
   }
   function removeTable(id){
     state.tables = state.tables.filter(function(t){ return t.id !== id; });
     delete state.assignment[id];
+    delete state.blocked[id];
     state.prefs = state.prefs.filter(function(p){ return p.type !== "head" || p.table !== id; });
+    saveState(); render();
+  }
+  function toggleBlockSeat(tableId, idx){
+    var t = tableById(tableId);
+    if(!t) return;
+    if(!state.blocked[tableId]) state.blocked[tableId] = new Array(t.seats).fill(false);
+    var occupant = state.assignment[tableId][idx];
+    if(!state.blocked[tableId][idx] && occupant) return; // can't block an occupied seat
+    state.blocked[tableId][idx] = !state.blocked[tableId][idx];
     saveState(); render();
   }
 
@@ -536,6 +605,10 @@
     var opp = ringOpposite(n, i);
     return ringNeighbor(n, opp).indexOf(j) !== -1;
   }
+  function isNextTo(n, i, j){
+    if(ringNeighbor(n, i).indexOf(j) !== -1) return true;
+    return !!state.cornersAdjacent && isCattyCorner(n, i, j);
+  }
 
   // ---------- scoring ----------
   function classifyHead(p){
@@ -550,8 +623,8 @@
     var seatA = findSeatOf(p.b), seatB = findSeatOf(p.c);
     var n = state.assignment[seatSubj.tableId].length;
     var neigh = ringNeighbor(n, seatSubj.idx);
-    var adjA = seatA && seatA.tableId===seatSubj.tableId && neigh.indexOf(seatA.idx)!==-1;
-    var adjB = seatB && seatB.tableId===seatSubj.tableId && neigh.indexOf(seatB.idx)!==-1;
+    var adjA = seatA && seatA.tableId===seatSubj.tableId && isNextTo(n, seatSubj.idx, seatA.idx);
+    var adjB = seatB && seatB.tableId===seatSubj.tableId && isNextTo(n, seatSubj.idx, seatB.idx);
     if(adjA || adjB) return "met";
     var sameA = seatA && seatA.tableId===seatSubj.tableId;
     var sameB = seatB && seatB.tableId===seatSubj.tableId;
@@ -565,7 +638,7 @@
     if(!seatA || !seatB) return "unseated";
     if(seatA.tableId !== seatB.tableId) return p.type === "avoid" ? "met" : "apart";
     var n = state.assignment[seatA.tableId].length;
-    var isAdjacent = ringNeighbor(n, seatA.idx).indexOf(seatB.idx) !== -1;
+    var isAdjacent = isNextTo(n, seatA.idx, seatB.idx);
     var isOpposite = ringOpposite(n, seatA.idx) === seatB.idx;
     var isCatty = isCattyCorner(n, seatA.idx, seatB.idx);
     if(p.type === "together") return isAdjacent ? "met" : "sameTable";
@@ -602,7 +675,7 @@
         if(sa && sb && sa.tableId === sb.tableId){
           score += 3;
           var n = state.assignment[sa.tableId].length;
-          if(ringNeighbor(n, sa.idx).indexOf(sb.idx) !== -1) score += 2;
+          if(isNextTo(n, sa.idx, sb.idx)) score += 2;
         }
       }
     }
@@ -622,7 +695,7 @@
       var t = tableById(p.table);
       if(!t) return;
       if(findSeatOf(p.a)) return; // already seated somewhere — respect the manual placement
-      if(state.assignment[p.table][0] === null){
+      if(state.assignment[p.table][0] === null && !(state.blocked[p.table] && state.blocked[p.table][0])){
         state.assignment[p.table][0] = p.a;
       }
     });
@@ -630,7 +703,7 @@
     var emptySlots = [];
     state.tables.forEach(function(t){
       state.assignment[t.id].forEach(function(gid, idx){
-        if(gid === null) emptySlots.push({tableId: t.id, idx: idx});
+        if(gid === null && !(state.blocked[t.id] && state.blocked[t.id][idx])) emptySlots.push({tableId: t.id, idx: idx});
       });
     });
     var pool = trayGuests().map(function(g){ return g.id; });
@@ -698,6 +771,7 @@
 
   // ---------- selection / placement ----------
   function placeAt(guestId, tableId, idx){
+    if(state.blocked[tableId] && state.blocked[tableId][idx]) return;
     var from = guestId ? findSeatOf(guestId) : null;
     var target = state.assignment[tableId][idx];
     if(from){ state.assignment[from.tableId][from.idx] = target; }
@@ -710,6 +784,7 @@
     saveState(); render();
   }
   function swapSeats(t1, i1, t2, i2){
+    if((state.blocked[t1] && state.blocked[t1][i1]) || (state.blocked[t2] && state.blocked[t2][i2])) return;
     var g1 = state.assignment[t1][i1];
     var g2 = state.assignment[t2][i2];
     state.assignment[t1][i1] = g2;
@@ -768,6 +843,8 @@
       document.getElementById("tableName").value = t.name;
       document.getElementById("tableShape").value = t.shape;
       document.getElementById("tableSeats").value = t.seats;
+      updateSidesFieldsVisibility();
+      if(t.sides) setSidesFieldValues(t.sides);
       setSubmitLabel("tableForm", "Save changes");
       document.getElementById("tableCancelBtn").style.display = "";
       return;
@@ -776,6 +853,7 @@
       editingTableId = null;
       document.getElementById("tableForm").reset();
       document.getElementById("tableSeats").value = 8;
+      updateSidesFieldsVisibility();
       setSubmitLabel("tableForm", "Add table");
       document.getElementById("tableCancelBtn").style.display = "none";
       return;
@@ -863,7 +941,9 @@
     if(action === "select-seat"){
       var tableId = el.getAttribute("data-table");
       var idx = parseInt(el.getAttribute("data-idx"), 10);
+      var isBlocked = state.blocked[tableId] && state.blocked[tableId][idx];
       var occupant = state.assignment[tableId][idx];
+      if(isBlocked && !occupant) return; // blocked empty seats aren't a placement target
       if(selected && selected.kind==="tray"){
         placeAt(selected.guestId, tableId, idx);
         selected = null;
@@ -876,22 +956,68 @@
       }
       return;
     }
+    if(action === "toggle-block-seat"){
+      e.stopPropagation();
+      toggleBlockSeat(el.getAttribute("data-table"), parseInt(el.getAttribute("data-idx"), 10));
+      return;
+    }
+  }
+
+  function updateSidesFieldsVisibility(){
+    var shape = document.getElementById("tableShape").value;
+    var sidesEl = document.getElementById("sidesFields");
+    var totalEl = document.getElementById("totalSeatsField");
+    if(shape === "round"){
+      sidesEl.style.display = "none";
+      totalEl.style.display = "";
+    } else {
+      sidesEl.style.display = "";
+      totalEl.style.display = "none";
+    }
+  }
+  function setSidesFieldValues(sides){
+    document.getElementById("sideTop").value = sides[0];
+    document.getElementById("sideRight").value = sides[1];
+    document.getElementById("sideBottom").value = sides[2];
+    document.getElementById("sideLeft").value = sides[3];
+  }
+  function readSidesFieldValues(){
+    return [
+      parseInt(document.getElementById("sideTop").value, 10) || 0,
+      parseInt(document.getElementById("sideRight").value, 10) || 0,
+      parseInt(document.getElementById("sideBottom").value, 10) || 0,
+      parseInt(document.getElementById("sideLeft").value, 10) || 0
+    ];
   }
 
   // ---------- forms ----------
   function wireForms(){
+    updateSidesFieldsVisibility();
+    document.getElementById("tableShape").addEventListener("change", function(){
+      updateSidesFieldsVisibility();
+      var shape = document.getElementById("tableShape").value;
+      if(shape !== "round"){
+        var seats = parseInt(document.getElementById("tableSeats").value, 10) || 8;
+        setSidesFieldValues(defaultSides(shape, seats));
+      }
+    });
+    document.getElementById("cornerToggle").addEventListener("change", function(e){
+      state.cornersAdjacent = e.target.checked;
+      saveState(); render();
+    });
     document.getElementById("tableForm").addEventListener("submit", function(e){
       e.preventDefault();
       var name = document.getElementById("tableName").value.trim();
       var shape = document.getElementById("tableShape").value;
       var seats = parseInt(document.getElementById("tableSeats").value, 10) || 8;
+      var sides = shape === "round" ? null : readSidesFieldValues();
       if(editingTableId){
-        updateTable(editingTableId, name, shape, seats);
+        updateTable(editingTableId, name, shape, seats, sides);
         editingTableId = null;
         setSubmitLabel("tableForm", "Add table");
         document.getElementById("tableCancelBtn").style.display = "none";
       } else {
-        addTable(name, shape, seats);
+        addTable(name, shape, seats, sides);
       }
       document.getElementById("tableName").value = "";
     });
@@ -965,6 +1091,7 @@
   }
 
   function render(){
+    document.getElementById("cornerToggle").checked = !!state.cornersAdjacent;
     renderTables();
     renderGuests();
     renderPrefs();
@@ -1086,19 +1213,18 @@
       var r = Math.max(rBase, rFit);
       return {kind:"round", r: r, w: r*2, h: r*2};
     }
-    var perSide = Math.ceil(t.seats / (t.shape==="square" ? 4 : 2));
-    if(t.shape === "square"){
-      var side = Math.max(90, perSide*42 + 40);
-      return {kind:"rect", w: side, h: side};
-    }
-    var w = Math.max(150, perSide*42 + 50);
-    return {kind:"rect", w: w, h: 86};
+    var sides = t.sides || defaultSides(t.shape, t.seats);
+    var topN = sides[0], rightN = sides[1], bottomN = sides[2], leftN = sides[3];
+    var w = Math.max(110, Math.max(topN, bottomN)*42 + 50);
+    var h = Math.max(86, Math.max(leftN, rightN)*42 + 40);
+    return {kind:"rect", w: w, h: h};
   }
 
   function seatLocalPositions(t, dims){
-    var n = t.seats, pts = [];
+    var pts = [];
     var offset = 25;
     if(dims.kind === "round"){
+      var n = t.seats;
       var cx = dims.w/2, cy = dims.h/2, r = dims.r;
       for(var i=0;i<n;i++){
         var ang = -Math.PI/2 + i * (2*Math.PI/n);
@@ -1106,15 +1232,21 @@
       }
       return pts;
     }
-    var w = dims.w, h = dims.h, perim = 2*(w+h);
-    for(var k=0;k<n;k++){
-      var d = ((k+0.5)/n) * perim, x, y, nx, ny;
-      if(d < w){ x=d; y=0; nx=0; ny=-1; }
-      else if(d < w+h){ x=w; y=d-w; nx=1; ny=0; }
-      else if(d < 2*w+h){ x=w-(d-w-h); y=h; nx=0; ny=1; }
-      else { x=0; y=h-(d-2*w-h); nx=-1; ny=0; }
-      pts.push({x: x + nx*offset, y: y + ny*offset});
-    }
+    var sides = t.sides || defaultSides(t.shape, t.seats);
+    var w = dims.w, h = dims.h;
+    var placeAlong = function(count, from, to, nx, ny){
+      for(var k=0;k<count;k++){
+        var frac = (k+0.5)/count;
+        var x = from.x + (to.x-from.x)*frac;
+        var y = from.y + (to.y-from.y)*frac;
+        pts.push({x: x + nx*offset, y: y + ny*offset});
+      }
+    };
+    // order: top (L->R), right (T->B), bottom (R->L), left (B->T) — matches old perimeter order
+    placeAlong(sides[0], {x:0,y:0}, {x:w,y:0}, 0, -1);
+    placeAlong(sides[1], {x:w,y:0}, {x:w,y:h}, 1, 0);
+    placeAlong(sides[2], {x:w,y:h}, {x:0,y:h}, 0, 1);
+    placeAlong(sides[3], {x:0,y:h}, {x:0,y:0}, -1, 0);
     return pts;
   }
 
@@ -1155,15 +1287,16 @@
         var gx = tX + p.x, gy = tY + p.y;
         var gid = assign[idx];
         var guest = gid ? guestById(gid) : null;
+        var isBlocked = state.blocked[t.id] && state.blocked[t.id][idx];
         if(guest) coordMap[guest.id] = {x: gx, y: gy, tableId: t.id, idx: idx};
         var isSel = selected && selected.kind==="seat" && selected.tableId===t.id && selected.idx===idx;
         var isLocked = guest && state.locked[guest.id];
-        var fill = guest ? (guest.kid ? "var(--sage)" : "var(--brass)") : "var(--seat-empty)";
+        var fill = guest ? (guest.kid ? "var(--sage)" : "var(--brass)") : (isBlocked ? "url(#blockedPattern)" : "var(--seat-empty)");
         var stroke = isSel ? "var(--clay)" : (isLocked ? "var(--ink)" : "var(--line)");
         var sw = isSel ? 3 : (isLocked ? 2.5 : 1.5);
         var textFill = guest ? "#fff" : "var(--ink-soft)";
         var label = guest ? initials(guest.name) : "";
-        var title = guest ? escapeHtml(guest.name) : "Open seat";
+        var title = guest ? escapeHtml(guest.name) : (isBlocked ? "Blocked seat" : "Open seat");
         if(idx === 0){
           parts.push('<circle cx="'+gx+'" cy="'+gy+'" r="20" fill="none" stroke="var(--brass)" stroke-width="1.2" stroke-dasharray="2,3" opacity="0.55"/>');
         }
@@ -1173,6 +1306,13 @@
           '<text class="seat-label" x="'+gx+'" y="'+(gy+4)+'" text-anchor="middle" fill="'+textFill+'">'+label+'</text>' +
           '<title>'+title+'</title>' +
           '</g>');
+        if(!guest){
+          parts.push('<g class="seat-block-toggle" data-action="toggle-block-seat" data-table="'+t.id+'" data-idx="'+idx+'" style="cursor:pointer">' +
+            '<circle cx="'+(gx+11)+'" cy="'+(gy-11)+'" r="7" fill="var(--card)" stroke="var(--line)" stroke-width="1"/>' +
+            '<text x="'+(gx+11)+'" y="'+(gy-8)+'" text-anchor="middle" font-size="9" fill="var(--ink-soft)">'+(isBlocked?"↺":"✕")+'</text>' +
+            '<title>'+(isBlocked?"Unblock seat":"Block seat")+'</title>' +
+            '</g>');
+        }
       });
     });
 
@@ -1183,10 +1323,9 @@
         if(!subj) return;
         var optA = coordMap[p.b], optB = coordMap[p.c];
         var n = state.assignment[subj.tableId].length;
-        var neigh = ringNeighbor(n, subj.idx);
         var target = null, stroke2, dash2;
-        if(optA && optA.tableId===subj.tableId && neigh.indexOf(optA.idx)!==-1){ target = optA; }
-        else if(optB && optB.tableId===subj.tableId && neigh.indexOf(optB.idx)!==-1){ target = optB; }
+        if(optA && optA.tableId===subj.tableId && isNextTo(n, subj.idx, optA.idx)){ target = optA; }
+        else if(optB && optB.tableId===subj.tableId && isNextTo(n, subj.idx, optB.idx)){ target = optB; }
         if(target){ stroke2 = "var(--sage)"; dash2 = "0"; }
         else if(optA && optA.tableId===subj.tableId){ target = optA; stroke2 = "var(--brass)"; dash2 = "2,3"; }
         else if(optB && optB.tableId===subj.tableId){ target = optB; stroke2 = "var(--brass)"; dash2 = "2,3"; }
@@ -1208,7 +1347,9 @@
       parts.push('<line x1="'+pa.x+'" y1="'+pa.y+'" x2="'+pb.x+'" y2="'+pb.y+'" stroke="'+stroke+'" stroke-width="1.6" stroke-dasharray="'+dash+'" opacity="0.75"/>');
     });
 
-    wrap.innerHTML = '<svg viewBox="0 0 '+svgW+' '+svgH+'" width="'+Math.min(svgW, 980)+'" height="'+(svgH*Math.min(svgW,980)/svgW)+'" xmlns="http://www.w3.org/2000/svg">' + parts.join("") + '</svg>';
+    var defs = '<defs><pattern id="blockedPattern" width="6" height="6" patternTransform="rotate(45)" patternUnits="userSpaceOnUse">' +
+      '<rect width="6" height="6" fill="var(--seat-empty)"/><line x1="0" y1="0" x2="0" y2="6" stroke="var(--clay)" stroke-width="2"/></pattern></defs>';
+    wrap.innerHTML = '<svg viewBox="0 0 '+svgW+' '+svgH+'" width="'+Math.min(svgW, 980)+'" height="'+(svgH*Math.min(svgW,980)/svgW)+'" xmlns="http://www.w3.org/2000/svg">' + defs + parts.join("") + '</svg>';
   }
 
   function renderReport(){
