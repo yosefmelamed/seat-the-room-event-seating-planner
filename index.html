@@ -185,10 +185,12 @@
   footer.hint { text-align: center; color: var(--ink-soft); font-size: 12px; padding: 30px 20px 40px; }
 
   @media print {
-    header.topbar, .panel, footer.hint, .toolbar, .warning-banner, .toolbar-note { display: none !important; }
+    header.topbar, footer.hint, .toolbar, .warning-banner, .toolbar-note,
+    .left-col, .right-col .panel:not(.print-panel) { display: none !important; }
     .app-shell { grid-template-columns: 1fr; padding: 0; }
     body { background: #fff; }
     .canvas-wrap { overflow: visible; }
+    .print-panel .tray { display: none !important; }
   }
 </style>
 </head>
@@ -288,7 +290,7 @@
 
     <div id="warningBanner"></div>
 
-    <section class="panel">
+    <section class="panel print-panel">
       <h2>Floor plan</h2>
       <div class="canvas-wrap">
         <div id="floorPlanWrap"></div>
