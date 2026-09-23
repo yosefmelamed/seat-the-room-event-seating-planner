@@ -170,6 +170,22 @@
   .tray-chip.selected { border-color: var(--clay); color: var(--clay); }
   .tray-empty { color: var(--ink-soft); font-size: 13px; }
 
+  .print-cards-panel { display: none; }
+  .print-cards-summary { color: var(--ink-soft); font-size: 12.5px; margin: 0 0 12px 2px; }
+  .cards-grid {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 10px;
+  }
+  .seating-card {
+    background: var(--card); border: 1.5px solid var(--line); border-radius: 10px;
+    min-height: 104px; padding: 12px; display: flex; flex-direction: column; justify-content: space-between;
+    box-shadow: var(--shadow);
+  }
+  .seating-card.seated { border-color: var(--brass); }
+  .seating-card.unseated { border-style: dashed; }
+  .card-seat { color: var(--ink-soft); font-size: 12px; }
+  .card-name { font-family: "Fraunces", serif; font-size: 19px; line-height: 1.08; margin: 6px 0 8px; }
+  .card-meta { color: var(--ink-soft); font-size: 12.5px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+
   .report-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
   .report-list li { font-size: 13px; display: flex; gap: 8px; align-items: flex-start; }
   .report-dot { width: 8px; height: 8px; border-radius: 50%; margin-top: 5px; flex: none; }
@@ -195,6 +211,11 @@
     body { background: #fff; }
     .canvas-wrap { overflow: visible; }
     .print-panel .tray { display: none !important; }
+    body[data-print-mode="cards"] .print-floor-plan { display: none !important; }
+    body[data-print-mode="cards"] .print-cards-panel { display: block !important; }
+    body[data-print-mode="cards"] .cards-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    body[data-print-mode="cards"] .seating-card { break-inside: avoid; page-break-inside: avoid; box-shadow: none; }
+    body[data-print-mode="chart"] .print-cards-panel { display: none !important; }
   }
 </style>
 </head>
@@ -296,6 +317,7 @@
       <button class="primary-cta" data-action="rearrange">Rearrange</button>
       <button class="ghost" data-action="clear-seating">Clear seats</button>
       <button class="ghost" data-action="print">Print chart</button>
+      <button class="ghost" data-action="print-cards">Print seating cards</button>
       <div class="spacer"></div>
       <button class="ghost small" data-action="reset-all">Reset everything</button>
     </div>
@@ -303,7 +325,7 @@
 
     <div id="warningBanner"></div>
 
-    <section class="panel print-panel">
+    <section class="panel print-panel print-floor-plan">
       <h2>Floor plan</h2>
       <div class="canvas-wrap">
         <div id="floorPlanWrap"></div>
@@ -318,6 +340,12 @@
         <span>Drag a name onto a seat, or tap one then tap where it should go. Tap an empty seat's ✕ to block it off.</span>
       </div>
       <div class="tray" id="trayList"></div>
+    </section>
+
+    <section class="panel print-panel print-cards-panel">
+      <h2>Seating cards</h2>
+      <p class="print-cards-summary" id="seatingCardsSummary"></p>
+      <div class="cards-grid" id="seatingCardsList"></div>
     </section>
 
     <section class="panel">
@@ -340,6 +368,7 @@
   var selected = null; // {kind:'seat', tableId, idx} | {kind:'tray', guestId}
   var lastWarning = "";
   var editingTableId = null, editingGuestId = null, editingPrefId = null, editingHeadId = null, editingEitherId = null;
+  var printMode = "chart";
 
   function uid(prefix){ return prefix + "_" + Math.random().toString(36).slice(2,9); }
   function shuffle(arr){
@@ -418,6 +447,7 @@
     document.addEventListener("dragstart", handleDragStart);
     document.addEventListener("dragover", handleDragOver);
     document.addEventListener("drop", handleDrop);
+    window.addEventListener("afterprint", clearPrintMode);
     render();
   }
 
@@ -830,7 +860,8 @@
       if(confirm("Clear all tables, guests, and preferences?")) resetAll();
       return;
     }
-    if(action === "print"){ window.print(); return; }
+    if(action === "print"){ setPrintMode("chart"); window.print(); return; }
+    if(action === "print-cards"){ setPrintMode("cards"); window.print(); return; }
 
     if(action === "remove-table") return removeTable(el.getAttribute("data-id"));
     if(action === "remove-guest") return removeGuest(el.getAttribute("data-id"));
@@ -1099,9 +1130,20 @@
     renderHeadSelects();
     renderEitherSelects();
     renderFloorPlan();
+    renderSeatingCards();
     renderTray();
     renderReport();
     renderWarning();
+  }
+
+  function setPrintMode(mode){
+    printMode = mode === "cards" ? "cards" : "chart";
+    document.body.setAttribute("data-print-mode", printMode);
+  }
+
+  function clearPrintMode(){
+    printMode = "chart";
+    document.body.removeAttribute("data-print-mode");
   }
 
   function renderWarning(){
@@ -1196,6 +1238,56 @@
     el.innerHTML = tray.map(function(g){
       var sel = selected && selected.kind==="tray" && selected.guestId===g.id;
       return '<div class="tray-chip' + (g.kid?' kid':'') + (sel?' selected':'') + '" draggable="true" data-drag-guest="' + g.id + '" data-action="select-tray" data-id="' + g.id + '">' + escapeHtml(g.name) + '</div>';
+    }).join("");
+  }
+
+  function seatLabel(t, idx){
+    if(idx === 0) return "Head seat";
+    return "Seat " + (idx + 1);
+  }
+
+  function renderSeatingCards(){
+    var list = document.getElementById("seatingCardsList");
+    var summary = document.getElementById("seatingCardsSummary");
+    var cards = [];
+    var seated = {};
+
+    state.tables.forEach(function(t){
+      var seats = state.assignment[t.id] || [];
+      seats.forEach(function(gid, idx){
+        if(!gid) return;
+        var g = guestById(gid);
+        if(!g) return;
+        seated[g.id] = true;
+        cards.push({guest: g, table: t, idx: idx, seated: true});
+      });
+    });
+
+    state.guests.forEach(function(g){
+      if(!seated[g.id]) cards.push({guest: g, seated: false});
+    });
+
+    if(cards.length === 0){
+      list.innerHTML = '<div class="empty-note">No guests yet — add guests before printing cards.</div>';
+      summary.textContent = "";
+      return;
+    }
+
+    var seatedCount = cards.filter(function(card){ return card.seated; }).length;
+    var unassignedCount = cards.length - seatedCount;
+    summary.textContent = seatedCount + " seated card(s)" + (unassignedCount ? " • " + unassignedCount + " unassigned" : "");
+    list.innerHTML = cards.map(function(card){
+      var meta = [];
+      if(card.guest.kid) meta.push('<span class="tag kid">child</span>');
+      if(card.seated){
+        meta.push('<span>' + escapeHtml(card.table.name) + '</span>');
+      } else {
+        meta.push('<span>Unassigned</span>');
+      }
+      return '<div class="seating-card ' + (card.seated ? 'seated' : 'unseated') + '">' +
+        '<div><div class="card-seat">' + (card.seated ? escapeHtml(seatLabel(card.table, card.idx)) : 'Unassigned') + '</div>' +
+        '<div class="card-name">' + escapeHtml(card.guest.name) + '</div></div>' +
+        '<div class="card-meta">' + meta.join("") + '</div></div>';
     }).join("");
   }
 
