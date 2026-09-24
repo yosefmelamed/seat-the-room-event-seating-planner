@@ -202,6 +202,9 @@
   }
   .tent-card {
     position: relative;
+    display: flex; flex-direction: column;
+    width: var(--tc-w, 4.25in); height: var(--tc-h, 5.5in);
+    max-width: 100%;
     background: var(--tc-bg, #FFFFFF);
     color: var(--tc-text, #23283B);
     border-style: var(--tc-border-style, solid);
@@ -211,12 +214,15 @@
     font-family: var(--tc-font, "Fraunces", serif);
     box-shadow: var(--shadow);
     overflow: hidden;
+    margin: 0 auto;
   }
   .tent-card .tent-half {
+    flex: 1 1 0; min-height: 0;
     padding: 16px 14px; display: flex; flex-direction: column; align-items: center; justify-content: center;
-    text-align: center; min-height: 96px;
+    text-align: center; overflow: hidden;
   }
   .tent-card .tent-fold-line {
+    flex: none;
     border-top: 1px dashed var(--tc-border-color, #E4DBC4); position: relative;
   }
   .tent-card .tent-fold-line::after {
