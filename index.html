@@ -1477,6 +1477,7 @@
     var unassignedCount = cards.length - seatedCount;
     summary.textContent = seatedCount + " seated card(s)" + (unassignedCount ? " • " + unassignedCount + " unassigned" : "");
     list.innerHTML = cards.map(function(card){ return cardHtml(card, s); }).join("");
+    list.style.gridTemplateColumns = "repeat(" + (s.cols || 2) + ", 1fr)";
     previewSlot.innerHTML = cardHtml(cards[0], s);
   }
 
