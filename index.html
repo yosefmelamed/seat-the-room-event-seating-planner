@@ -6,7 +6,7 @@
 <title>Seat the Room — event seating planner</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=IBM+Plex+Sans:wght@400;500;600&family=Playfair+Display:wght@400;600;700&family=Montserrat:wght@400;500;600;700&family=Great+Vibes&display=swap" rel="stylesheet">
 <style>
   :root {
     box-sizing: border-box;
@@ -170,21 +170,73 @@
   .tray-chip.selected { border-color: var(--clay); color: var(--clay); }
   .tray-empty { color: var(--ink-soft); font-size: 13px; }
 
-  .print-cards-panel { display: none; }
   .print-cards-summary { color: var(--ink-soft); font-size: 12.5px; margin: 0 0 12px 2px; }
+
+  /* ---- card builder (screen only) ---- */
+  .card-builder {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-bottom: 16px;
+  }
+  @media (max-width: 720px) { .card-builder { grid-template-columns: 1fr; } }
+  .builder-fields { display: flex; flex-direction: column; gap: 10px; }
+  .builder-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+  .builder-row label { font-size: 12.5px; color: var(--ink-soft); display: flex; flex-direction: column; gap: 3px; flex: 1 1 120px; }
+  .builder-row label span.lbl { font-weight: 500; color: var(--ink); }
+  .builder-row select, .builder-row input[type="number"], .builder-row input[type="text"] {
+    font: inherit; padding: 6px 8px; border-radius: 6px; border: 1px solid var(--line);
+    background: var(--card); color: var(--ink); width: 100%;
+  }
+  .builder-row input[type="color"] {
+    width: 40px; height: 30px; padding: 2px; border-radius: 6px; border: 1px solid var(--line); background: var(--card);
+  }
+  .builder-row input[type="range"] { flex: 1 1 100px; }
+  .swatch-value { font-size: 11.5px; color: var(--ink-soft); white-space: nowrap; }
+  .builder-preview-wrap {
+    display: flex; align-items: center; justify-content: center; padding: 18px;
+    background: repeating-linear-gradient(45deg, var(--panel), var(--panel) 10px, var(--bg) 10px, var(--bg) 20px);
+    border-radius: 10px; border: 1px solid var(--line);
+  }
+
+  /* ---- printable tent card ---- */
   .cards-grid {
-    display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 10px;
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px;
   }
-  .seating-card {
-    background: var(--card); border: 1.5px solid var(--line); border-radius: 10px;
-    min-height: 104px; padding: 12px; display: flex; flex-direction: column; justify-content: space-between;
+  .tent-card {
+    position: relative;
+    background: var(--tc-bg, #FFFFFF);
+    color: var(--tc-text, #23283B);
+    border-style: var(--tc-border-style, solid);
+    border-width: var(--tc-border-width, 1.5px);
+    border-color: var(--tc-border-color, #E4DBC4);
+    border-radius: var(--tc-radius, 10px);
+    font-family: var(--tc-font, "Fraunces", serif);
     box-shadow: var(--shadow);
+    overflow: hidden;
   }
-  .seating-card.seated { border-color: var(--brass); }
-  .seating-card.unseated { border-style: dashed; }
-  .card-seat { color: var(--ink-soft); font-size: 12px; }
-  .card-name { font-family: "Fraunces", serif; font-size: 19px; line-height: 1.08; margin: 6px 0 8px; }
-  .card-meta { color: var(--ink-soft); font-size: 12.5px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+  .tent-card .tent-half {
+    padding: 16px 14px; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    text-align: center; min-height: 96px;
+  }
+  .tent-card .tent-fold-line {
+    border-top: 1px dashed var(--tc-border-color, #E4DBC4); position: relative;
+  }
+  .tent-card .tent-fold-line::after {
+    content: "fold"; position: absolute; left: 50%; top: -8px; transform: translateX(-50%);
+    background: var(--tc-bg, #fff); color: var(--ink-soft); font-size: 9px; font-family: "IBM Plex Sans", sans-serif;
+    padding: 0 6px; letter-spacing: 0.06em; text-transform: uppercase;
+  }
+  .tent-card .card-seat {
+    font-family: "IBM Plex Sans", sans-serif; color: var(--tc-accent, var(--ink-soft)); font-size: 11.5px;
+    letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 6px;
+  }
+  .tent-card .card-name {
+    font-size: var(--tc-name-size, 24px); line-height: 1.1; font-weight: 600; word-break: break-word;
+  }
+  .tent-card .card-meta {
+    font-family: "IBM Plex Sans", sans-serif; color: var(--tc-accent, var(--ink-soft)); font-size: 11px;
+    display: flex; flex-wrap: wrap; gap: 5px; align-items: center; justify-content: center; margin-top: 6px;
+  }
+  .tent-card.unseated { border-style: dashed; }
+  .tent-card .tent-half.tent-flip { transform: rotate(180deg); }
 
   .report-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
   .report-list li { font-size: 13px; display: flex; gap: 8px; align-items: flex-start; }
@@ -213,8 +265,16 @@
     .print-panel .tray { display: none !important; }
     body[data-print-mode="cards"] .print-floor-plan { display: none !important; }
     body[data-print-mode="cards"] .print-cards-panel { display: block !important; }
-    body[data-print-mode="cards"] .cards-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-    body[data-print-mode="cards"] .seating-card { break-inside: avoid; page-break-inside: avoid; box-shadow: none; }
+    body[data-print-mode="cards"] .card-builder,
+    body[data-print-mode="cards"] .print-cards-summary { display: none !important; }
+    body[data-print-mode="cards"] .cards-grid {
+      grid-template-columns: repeat(var(--tc-cols, 2), 1fr);
+      gap: 0.25in;
+    }
+    body[data-print-mode="cards"] .tent-card {
+      break-inside: avoid; page-break-inside: avoid; box-shadow: none;
+      width: var(--tc-w, 4.25in); height: var(--tc-h, 5.5in); margin: 0 auto;
+    }
     body[data-print-mode="chart"] .print-cards-panel { display: none !important; }
   }
 </style>
@@ -345,8 +405,80 @@
     <section class="panel print-panel print-cards-panel">
       <h2>Seating cards</h2>
       <p class="print-cards-summary" id="seatingCardsSummary"></p>
+
+      <div class="card-builder">
+        <div class="builder-fields">
+          <div class="builder-row">
+            <label><span class="lbl">Card size (preset)</span>
+              <select id="cardPreset">
+                <option value="avery5302">Avery 5302 — 4.25" × 5.5" (2/sheet)</option>
+                <option value="avery8315">Avery 8315 — 3.5" × 2" flat (10/sheet)</option>
+                <option value="custom">Custom size</option>
+              </select>
+            </label>
+            <label><span class="lbl">Cards per row (print)</span>
+              <input type="number" id="cardCols" min="1" max="4" value="2">
+            </label>
+          </div>
+          <div class="builder-row" id="cardCustomSizeRow" style="display:none">
+            <label><span class="lbl">Width (in)</span><input type="number" id="cardWidthIn" min="2" max="8.5" step="0.1" value="4.25"></label>
+            <label><span class="lbl">Height (in)</span><input type="number" id="cardHeightIn" min="2" max="11" step="0.1" value="5.5"></label>
+          </div>
+          <div class="builder-row">
+            <label><span class="lbl">Heading font</span>
+              <select id="cardFont">
+                <option value="Fraunces, serif">Fraunces (serif)</option>
+                <option value="'Playfair Display', serif">Playfair Display (serif)</option>
+                <option value="'Great Vibes', cursive">Great Vibes (script)</option>
+                <option value="'Montserrat', sans-serif">Montserrat (sans)</option>
+                <option value="'IBM Plex Sans', sans-serif">IBM Plex Sans (sans)</option>
+              </select>
+            </label>
+            <label><span class="lbl">Name size</span>
+              <input type="range" id="cardNameSize" min="16" max="40" step="1" value="24">
+            </label>
+            <span class="swatch-value" id="cardNameSizeValue">24px</span>
+          </div>
+          <div class="builder-row">
+            <label><span class="lbl">Background</span><input type="color" id="cardBg" value="#ffffff"></label>
+            <label><span class="lbl">Text color</span><input type="color" id="cardText" value="#23283b"></label>
+            <label><span class="lbl">Accent color</span><input type="color" id="cardAccent" value="#a97d3f"></label>
+          </div>
+          <div class="builder-row">
+            <label><span class="lbl">Border style</span>
+              <select id="cardBorderStyle">
+                <option value="solid">Solid</option>
+                <option value="dashed">Dashed</option>
+                <option value="dotted">Dotted</option>
+                <option value="double">Double</option>
+                <option value="none">None</option>
+              </select>
+            </label>
+            <label><span class="lbl">Border color</span><input type="color" id="cardBorderColor" value="#e4dbc4"></label>
+            <label><span class="lbl">Border width</span>
+              <input type="range" id="cardBorderWidth" min="0" max="6" step="0.5" value="1.5">
+            </label>
+            <span class="swatch-value" id="cardBorderWidthValue">1.5px</span>
+          </div>
+          <div class="builder-row">
+            <label><span class="lbl">Corner radius</span>
+              <input type="range" id="cardRadius" min="0" max="40" step="1" value="10">
+            </label>
+            <span class="swatch-value" id="cardRadiusValue">10px</span>
+            <label class="check"><input type="checkbox" id="cardShowMeta" checked> show table/seat details</label>
+          </div>
+          <div class="builder-row">
+            <button type="button" class="ghost small" data-action="reset-card-style">Reset to default style</button>
+          </div>
+        </div>
+        <div class="builder-preview-wrap">
+          <div class="cards-grid" id="cardPreviewSlot" style="grid-template-columns: 1fr; max-width: 260px;"></div>
+        </div>
+      </div>
+
       <div class="cards-grid" id="seatingCardsList"></div>
     </section>
+
 
     <section class="panel">
       <h2>How the plan is doing</h2>
@@ -406,7 +538,17 @@
     var blocked = {};
     blocked[t1.id] = new Array(t1.seats).fill(false);
     blocked[t2.id] = new Array(t2.seats).fill(false);
-    return { tables: [t1, t2], guests: guests, prefs: prefs, assignment: assignment, locked: {}, blocked: blocked, cornersAdjacent: false };
+    return { tables: [t1, t2], guests: guests, prefs: prefs, assignment: assignment, locked: {}, blocked: blocked, cornersAdjacent: false, cardStyle: defaultCardStyle() };
+  }
+
+  function defaultCardStyle(){
+    return {
+      preset: "avery5302", widthIn: 4.25, heightIn: 5.5, cols: 2,
+      font: "Fraunces, serif", nameSize: 24,
+      bg: "#ffffff", text: "#23283b", accent: "#a97d3f",
+      borderStyle: "solid", borderColor: "#e4dbc4", borderWidth: 1.5,
+      radius: 10, showMeta: true
+    };
   }
 
   function saveState(){
@@ -425,6 +567,8 @@
       if(!parsed.locked) parsed.locked = {};
       if(!parsed.blocked) parsed.blocked = {};
       if(typeof parsed.cornersAdjacent !== "boolean") parsed.cornersAdjacent = false;
+      if(!parsed.cardStyle) parsed.cardStyle = defaultCardStyle();
+      else parsed.cardStyle = Object.assign(defaultCardStyle(), parsed.cardStyle);
       parsed.tables.forEach(function(t){
         if(!parsed.assignment[t.id]) parsed.assignment[t.id] = new Array(t.seats).fill(null);
         var arr = parsed.assignment[t.id];
@@ -862,6 +1006,11 @@
     }
     if(action === "print"){ setPrintMode("chart"); window.print(); return; }
     if(action === "print-cards"){ setPrintMode("cards"); window.print(); return; }
+    if(action === "reset-card-style"){
+      state.cardStyle = defaultCardStyle();
+      saveState(); render();
+      return;
+    }
 
     if(action === "remove-table") return removeTable(el.getAttribute("data-id"));
     if(action === "remove-guest") return removeGuest(el.getAttribute("data-id"));
@@ -1024,6 +1173,7 @@
   // ---------- forms ----------
   function wireForms(){
     updateSidesFieldsVisibility();
+    wireCardBuilder();
     document.getElementById("tableShape").addEventListener("change", function(){
       updateSidesFieldsVisibility();
       var shape = document.getElementById("tableShape").value;
@@ -1130,6 +1280,7 @@
     renderHeadSelects();
     renderEitherSelects();
     renderFloorPlan();
+    syncCardBuilderFields();
     renderSeatingCards();
     renderTray();
     renderReport();
@@ -1246,12 +1397,51 @@
     return "Seat " + (idx + 1);
   }
 
-  function renderSeatingCards(){
-    var list = document.getElementById("seatingCardsList");
-    var summary = document.getElementById("seatingCardsSummary");
+  var CARD_PRESETS = {
+    avery5302: {widthIn: 4.25, heightIn: 5.5, cols: 2},
+    avery8315: {widthIn: 3.5, heightIn: 2, cols: 3}
+  };
+
+  function applyCardStylePreset(){
+    var s = state.cardStyle;
+    if(CARD_PRESETS[s.preset]){
+      s.widthIn = CARD_PRESETS[s.preset].widthIn;
+      s.heightIn = CARD_PRESETS[s.preset].heightIn;
+    }
+  }
+
+  function cardStyleVars(s){
+    return [
+      '--tc-bg:' + s.bg, '--tc-text:' + s.text, '--tc-accent:' + s.accent,
+      '--tc-border-style:' + (s.borderWidth > 0 ? s.borderStyle : "none"),
+      '--tc-border-color:' + s.borderColor, '--tc-border-width:' + s.borderWidth + 'px',
+      '--tc-radius:' + s.radius + 'px', '--tc-font:' + s.font, '--tc-name-size:' + s.nameSize + 'px',
+      '--tc-w:' + s.widthIn + 'in', '--tc-h:' + s.heightIn + 'in', '--tc-cols:' + s.cols
+    ].join(";");
+  }
+
+  function cardHtml(card, s){
+    return '<div class="tent-card ' + (card.seated ? 'seated' : 'unseated') + '" style="' + cardStyleVars(s) + '">' +
+      '<div class="tent-half">' + cardHalfInner(card, s) + '</div>' +
+      '<div class="tent-fold-line"></div>' +
+      '<div class="tent-half tent-flip">' + cardHalfInner(card, s) + '</div>' +
+      '</div>';
+  }
+
+  function cardHalfInner(card, s){
+    var meta = [];
+    if(s.showMeta){
+      if(card.guest.kid) meta.push('<span class="tag kid">child</span>');
+      meta.push('<span>' + (card.seated ? escapeHtml(card.table.name) : 'Unassigned') + '</span>');
+    }
+    return '<div class="card-seat">' + (card.seated ? escapeHtml(seatLabel(card.table, card.idx)) : 'Unassigned') + '</div>' +
+      '<div class="card-name">' + escapeHtml(card.guest.name) + '</div>' +
+      (meta.length ? '<div class="card-meta">' + meta.join("") + '</div>' : '');
+  }
+
+  function collectSeatingCards(){
     var cards = [];
     var seated = {};
-
     state.tables.forEach(function(t){
       var seats = state.assignment[t.id] || [];
       seats.forEach(function(gid, idx){
@@ -1262,33 +1452,113 @@
         cards.push({guest: g, table: t, idx: idx, seated: true});
       });
     });
-
     state.guests.forEach(function(g){
       if(!seated[g.id]) cards.push({guest: g, seated: false});
     });
+    return cards;
+  }
+
+  function renderSeatingCards(){
+    var list = document.getElementById("seatingCardsList");
+    var summary = document.getElementById("seatingCardsSummary");
+    var previewSlot = document.getElementById("cardPreviewSlot");
+    var s = state.cardStyle;
+
+    var cards = collectSeatingCards();
 
     if(cards.length === 0){
       list.innerHTML = '<div class="empty-note">No guests yet — add guests before printing cards.</div>';
       summary.textContent = "";
+      previewSlot.innerHTML = cardHtml({guest:{name:"Sample Guest", kid:false}, table:{name:"Table 1"}, idx:1, seated:true}, s);
       return;
     }
 
     var seatedCount = cards.filter(function(card){ return card.seated; }).length;
     var unassignedCount = cards.length - seatedCount;
     summary.textContent = seatedCount + " seated card(s)" + (unassignedCount ? " • " + unassignedCount + " unassigned" : "");
-    list.innerHTML = cards.map(function(card){
-      var meta = [];
-      if(card.guest.kid) meta.push('<span class="tag kid">child</span>');
-      if(card.seated){
-        meta.push('<span>' + escapeHtml(card.table.name) + '</span>');
-      } else {
-        meta.push('<span>Unassigned</span>');
-      }
-      return '<div class="seating-card ' + (card.seated ? 'seated' : 'unseated') + '">' +
-        '<div><div class="card-seat">' + (card.seated ? escapeHtml(seatLabel(card.table, card.idx)) : 'Unassigned') + '</div>' +
-        '<div class="card-name">' + escapeHtml(card.guest.name) + '</div></div>' +
-        '<div class="card-meta">' + meta.join("") + '</div></div>';
-    }).join("");
+    list.innerHTML = cards.map(function(card){ return cardHtml(card, s); }).join("");
+    previewSlot.innerHTML = cardHtml(cards[0], s);
+  }
+
+  function syncCardBuilderFields(){
+    var s = state.cardStyle;
+    document.getElementById("cardPreset").value = s.preset;
+    document.getElementById("cardCols").value = s.cols;
+    document.getElementById("cardCustomSizeRow").style.display = s.preset === "custom" ? "" : "none";
+    document.getElementById("cardWidthIn").value = s.widthIn;
+    document.getElementById("cardHeightIn").value = s.heightIn;
+    document.getElementById("cardFont").value = s.font;
+    document.getElementById("cardNameSize").value = s.nameSize;
+    document.getElementById("cardNameSizeValue").textContent = s.nameSize + "px";
+    document.getElementById("cardBg").value = s.bg;
+    document.getElementById("cardText").value = s.text;
+    document.getElementById("cardAccent").value = s.accent;
+    document.getElementById("cardBorderStyle").value = s.borderStyle;
+    document.getElementById("cardBorderColor").value = s.borderColor;
+    document.getElementById("cardBorderWidth").value = s.borderWidth;
+    document.getElementById("cardBorderWidthValue").textContent = s.borderWidth + "px";
+    document.getElementById("cardRadius").value = s.radius;
+    document.getElementById("cardRadiusValue").textContent = s.radius + "px";
+    document.getElementById("cardShowMeta").checked = !!s.showMeta;
+  }
+
+  function wireCardBuilder(){
+    function update(fn){
+      fn(state.cardStyle);
+      saveState();
+      renderSeatingCards();
+    }
+    document.getElementById("cardPreset").addEventListener("change", function(e){
+      update(function(s){
+        s.preset = e.target.value;
+        if(s.preset !== "custom") applyCardStylePreset();
+      });
+      document.getElementById("cardCustomSizeRow").style.display = state.cardStyle.preset === "custom" ? "" : "none";
+      document.getElementById("cardWidthIn").value = state.cardStyle.widthIn;
+      document.getElementById("cardHeightIn").value = state.cardStyle.heightIn;
+    });
+    document.getElementById("cardCols").addEventListener("input", function(e){
+      update(function(s){ s.cols = Math.max(1, Math.min(4, parseInt(e.target.value,10)||2)); });
+    });
+    document.getElementById("cardWidthIn").addEventListener("input", function(e){
+      update(function(s){ s.widthIn = parseFloat(e.target.value) || 4.25; });
+    });
+    document.getElementById("cardHeightIn").addEventListener("input", function(e){
+      update(function(s){ s.heightIn = parseFloat(e.target.value) || 5.5; });
+    });
+    document.getElementById("cardFont").addEventListener("change", function(e){
+      update(function(s){ s.font = e.target.value; });
+    });
+    document.getElementById("cardNameSize").addEventListener("input", function(e){
+      document.getElementById("cardNameSizeValue").textContent = e.target.value + "px";
+      update(function(s){ s.nameSize = parseInt(e.target.value,10) || 24; });
+    });
+    document.getElementById("cardBg").addEventListener("input", function(e){
+      update(function(s){ s.bg = e.target.value; });
+    });
+    document.getElementById("cardText").addEventListener("input", function(e){
+      update(function(s){ s.text = e.target.value; });
+    });
+    document.getElementById("cardAccent").addEventListener("input", function(e){
+      update(function(s){ s.accent = e.target.value; });
+    });
+    document.getElementById("cardBorderStyle").addEventListener("change", function(e){
+      update(function(s){ s.borderStyle = e.target.value; });
+    });
+    document.getElementById("cardBorderColor").addEventListener("input", function(e){
+      update(function(s){ s.borderColor = e.target.value; });
+    });
+    document.getElementById("cardBorderWidth").addEventListener("input", function(e){
+      document.getElementById("cardBorderWidthValue").textContent = e.target.value + "px";
+      update(function(s){ s.borderWidth = parseFloat(e.target.value) || 0; });
+    });
+    document.getElementById("cardRadius").addEventListener("input", function(e){
+      document.getElementById("cardRadiusValue").textContent = e.target.value + "px";
+      update(function(s){ s.radius = parseInt(e.target.value,10) || 0; });
+    });
+    document.getElementById("cardShowMeta").addEventListener("change", function(e){
+      update(function(s){ s.showMeta = e.target.checked; });
+    });
   }
 
   function escapeHtml(s){
