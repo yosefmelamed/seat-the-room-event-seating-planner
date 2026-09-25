@@ -6,7 +6,7 @@
 <title>Seat the Room — event seating planner</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=IBM+Plex+Sans:wght@400;500;600&family=Playfair+Display:wght@400;600;700&family=Montserrat:wght@400;500;600;700&family=Great+Vibes&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,400;1,9..144,500&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&family=Montserrat:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Great+Vibes&family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=Dancing+Script:wght@400;600;700&family=Cinzel:wght@400;600;700&family=Josefin+Sans:ital,wght@0,400;0,500;0,600;1,400&family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&family=Parisienne&display=swap" rel="stylesheet">
 <style>
   :root {
     box-sizing: border-box;
@@ -217,6 +217,13 @@
   }
   .builder-row input[type="range"] { flex: 1 1 100px; }
   .swatch-value { font-size: 11.5px; color: var(--ink-soft); white-space: nowrap; }
+  .size-quick-row { display: flex; gap: 4px; }
+  .size-quick-row .size-quick { padding: 5px 10px; }
+  .size-quick-row .size-quick.active,
+  .rich-toggle.active {
+    background: var(--brass); color: #fff; border-color: var(--brass);
+  }
+  .rich-toggle { padding: 5px 12px; min-width: 34px; }
   .builder-preview-wrap {
     display: flex; align-items: center; justify-content: center; padding: 18px;
     background: repeating-linear-gradient(45deg, var(--panel), var(--panel) 10px, var(--bg) 10px, var(--bg) 20px);
@@ -231,6 +238,14 @@
   }
   @media (min-width: 560px) {
     .cards-grid { grid-template-columns: repeat(var(--tc-cols, 2), 1fr); }
+  }
+  .cards-grid.preview-row {
+    grid-template-rows: 1fr;
+    grid-auto-rows: 0;
+    overflow: hidden;
+  }
+  .cards-preview-note {
+    color: var(--ink-soft); font-size: 12.5px; margin: 10px 2px 0;
   }
   .tent-card {
     position: relative;
@@ -268,11 +283,22 @@
     letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 6px;
   }
   .tent-card .card-name {
-    font-size: clamp(16px, 5vw, var(--tc-name-size, 24px)); line-height: 1.1; font-weight: 600; word-break: break-word;
+    font-size: clamp(16px, 5vw, var(--tc-name-size, 24px)); line-height: 1.1;
+    font-weight: var(--tc-name-weight, 600); font-style: var(--tc-name-style, normal);
+    text-decoration: var(--tc-name-decoration, none); word-break: break-word;
   }
   .tent-card .card-meta {
     font-family: "IBM Plex Sans", sans-serif; color: var(--tc-accent, var(--ink-soft)); font-size: 11px;
     display: flex; flex-wrap: wrap; gap: 5px; align-items: center; justify-content: center; margin-top: 6px;
+  }
+  .tent-card .card-message {
+    font-family: var(--tc-msg-font, "IBM Plex Sans", sans-serif);
+    font-size: var(--tc-msg-size, 12px);
+    font-weight: var(--tc-msg-weight, 400);
+    font-style: var(--tc-msg-style, normal);
+    text-decoration: var(--tc-msg-decoration, none);
+    color: var(--tc-accent, var(--ink-soft));
+    margin-top: 8px; word-break: break-word;
   }
   .tent-card.unseated { border-style: dashed; }
   .tent-card .tent-half.tent-flip { transform: rotate(180deg); }
@@ -310,6 +336,10 @@
       grid-template-columns: repeat(var(--tc-cols, 2), 1fr);
       gap: 0.25in;
     }
+    body[data-print-mode="cards"] .cards-grid.preview-row {
+      grid-template-rows: none; grid-auto-rows: auto; overflow: visible;
+    }
+    .cards-preview-note { display: none !important; }
     body[data-print-mode="cards"] .tent-card {
       break-inside: avoid; page-break-inside: avoid; box-shadow: none;
       width: var(--tc-w, 4.25in); height: var(--tc-h, 5.5in); margin: 0 auto;
@@ -468,15 +498,37 @@
               <select id="cardFont">
                 <option value="Fraunces, serif">Fraunces (serif)</option>
                 <option value="'Playfair Display', serif">Playfair Display (serif)</option>
+                <option value="'Cormorant Garamond', serif">Cormorant Garamond (serif)</option>
+                <option value="'Libre Baskerville', serif">Libre Baskerville (serif)</option>
+                <option value="'Cinzel', serif">Cinzel (serif, elegant)</option>
                 <option value="'Great Vibes', cursive">Great Vibes (script)</option>
+                <option value="'Dancing Script', cursive">Dancing Script (script)</option>
+                <option value="'Parisienne', cursive">Parisienne (script)</option>
                 <option value="'Montserrat', sans-serif">Montserrat (sans)</option>
+                <option value="'Josefin Sans', sans-serif">Josefin Sans (sans)</option>
                 <option value="'IBM Plex Sans', sans-serif">IBM Plex Sans (sans)</option>
               </select>
             </label>
+          </div>
+          <div class="builder-row">
             <label><span class="lbl">Name size</span>
-              <input type="range" id="cardNameSize" min="16" max="40" step="1" value="24">
+              <div class="size-quick-row">
+                <button type="button" class="ghost small size-quick" data-size="18">S</button>
+                <button type="button" class="ghost small size-quick" data-size="24">M</button>
+                <button type="button" class="ghost small size-quick" data-size="30">L</button>
+                <button type="button" class="ghost small size-quick" data-size="38">XL</button>
+              </div>
+            </label>
+            <label><span class="lbl">Fine-tune size</span>
+              <input type="range" id="cardNameSize" min="12" max="60" step="1" value="24">
             </label>
             <span class="swatch-value" id="cardNameSizeValue">24px</span>
+          </div>
+          <div class="builder-row">
+            <span class="lbl" style="flex:0 0 auto;">Name style</span>
+            <button type="button" class="ghost small rich-toggle" id="cardNameBold" title="Bold"><b>B</b></button>
+            <button type="button" class="ghost small rich-toggle" id="cardNameItalic" title="Italic"><i>I</i></button>
+            <button type="button" class="ghost small rich-toggle" id="cardNameUnderline" title="Underline"><u>U</u></button>
           </div>
           <div class="builder-row">
             <label><span class="lbl">Background</span><input type="color" id="cardBg" value="#ffffff"></label>
@@ -507,6 +559,34 @@
             <label class="check"><input type="checkbox" id="cardShowMeta" checked> show table/seat details</label>
           </div>
           <div class="builder-row">
+            <label style="flex:1 1 100%;"><span class="lbl">Custom message (optional, e.g. a quote or thank-you line)</span>
+              <input type="text" id="cardMessage" maxlength="80" placeholder="e.g. Thank you for celebrating with us!">
+            </label>
+          </div>
+          <div class="builder-row">
+            <label><span class="lbl">Message font</span>
+              <select id="cardMessageFont">
+                <option value="'IBM Plex Sans', sans-serif">IBM Plex Sans (sans)</option>
+                <option value="'Montserrat', sans-serif">Montserrat (sans)</option>
+                <option value="'Josefin Sans', sans-serif">Josefin Sans (sans)</option>
+                <option value="Fraunces, serif">Fraunces (serif)</option>
+                <option value="'Cormorant Garamond', serif">Cormorant Garamond (serif)</option>
+                <option value="'Great Vibes', cursive">Great Vibes (script)</option>
+                <option value="'Dancing Script', cursive">Dancing Script (script)</option>
+              </select>
+            </label>
+            <label><span class="lbl">Message size</span>
+              <input type="range" id="cardMessageSize" min="9" max="24" step="1" value="12">
+            </label>
+            <span class="swatch-value" id="cardMessageSizeValue">12px</span>
+          </div>
+          <div class="builder-row">
+            <span class="lbl" style="flex:0 0 auto;">Message style</span>
+            <button type="button" class="ghost small rich-toggle" id="cardMessageBold" title="Bold"><b>B</b></button>
+            <button type="button" class="ghost small rich-toggle" id="cardMessageItalic" title="Italic"><i>I</i></button>
+            <button type="button" class="ghost small rich-toggle" id="cardMessageUnderline" title="Underline"><u>U</u></button>
+          </div>
+          <div class="builder-row">
             <button type="button" class="ghost small" data-action="reset-card-style">Reset to default style</button>
           </div>
         </div>
@@ -516,8 +596,8 @@
       </div>
 
       <div class="cards-grid" id="seatingCardsList"></div>
+      <p class="cards-preview-note" id="cardsPreviewNote"></p>
     </section>
-
 
     <section class="panel">
       <h2>How the plan is doing</h2>
@@ -584,9 +664,12 @@
     return {
       preset: "avery5302", widthIn: 4.25, heightIn: 5.5, cols: 2,
       font: "Fraunces, serif", nameSize: 24,
+      nameBold: true, nameItalic: false, nameUnderline: false,
       bg: "#ffffff", text: "#23283b", accent: "#a97d3f",
       borderStyle: "solid", borderColor: "#e4dbc4", borderWidth: 1.5,
-      radius: 10, showMeta: true
+      radius: 10, showMeta: true,
+      message: "", messageFont: "'IBM Plex Sans', sans-serif", messageSize: 12,
+      messageBold: false, messageItalic: true, messageUnderline: false
     };
   }
 
@@ -1455,6 +1538,14 @@
       '--tc-border-style:' + (s.borderWidth > 0 ? s.borderStyle : "none"),
       '--tc-border-color:' + s.borderColor, '--tc-border-width:' + s.borderWidth + 'px',
       '--tc-radius:' + s.radius + 'px', '--tc-font:' + s.font, '--tc-name-size:' + s.nameSize + 'px',
+      '--tc-name-weight:' + (s.nameBold ? '700' : '500'),
+      '--tc-name-style:' + (s.nameItalic ? 'italic' : 'normal'),
+      '--tc-name-decoration:' + (s.nameUnderline ? 'underline' : 'none'),
+      '--tc-msg-font:' + (s.messageFont || "'IBM Plex Sans', sans-serif"),
+      '--tc-msg-size:' + (s.messageSize || 12) + 'px',
+      '--tc-msg-weight:' + (s.messageBold ? '600' : '400'),
+      '--tc-msg-style:' + (s.messageItalic ? 'italic' : 'normal'),
+      '--tc-msg-decoration:' + (s.messageUnderline ? 'underline' : 'none'),
       '--tc-w:' + s.widthIn + 'in', '--tc-h:' + s.heightIn + 'in', '--tc-cols:' + s.cols,
       '--tc-ratio:' + (s.widthIn / s.heightIn)
     ].join(";");
@@ -1476,7 +1567,8 @@
     }
     return '<div class="card-seat">' + (card.seated ? escapeHtml(seatLabel(card.table, card.idx)) : 'Unassigned') + '</div>' +
       '<div class="card-name">' + escapeHtml(card.guest.name) + '</div>' +
-      (meta.length ? '<div class="card-meta">' + meta.join("") + '</div>' : '');
+      (meta.length ? '<div class="card-meta">' + meta.join("") + '</div>' : '') +
+      (s.message ? '<div class="card-message">' + escapeHtml(s.message) + '</div>' : '');
   }
 
   function collectSeatingCards(){
@@ -1502,13 +1594,16 @@
     var list = document.getElementById("seatingCardsList");
     var summary = document.getElementById("seatingCardsSummary");
     var previewSlot = document.getElementById("cardPreviewSlot");
+    var previewNote = document.getElementById("cardsPreviewNote");
     var s = state.cardStyle;
 
     var cards = collectSeatingCards();
 
     if(cards.length === 0){
       list.innerHTML = '<div class="empty-note">No guests yet — add guests before printing cards.</div>';
+      list.classList.remove("preview-row");
       summary.textContent = "";
+      previewNote.textContent = "";
       previewSlot.innerHTML = cardHtml({guest:{name:"Sample Guest", kid:false}, table:{name:"Table 1"}, idx:1, seated:true}, s);
       return;
     }
@@ -1518,6 +1613,12 @@
     summary.textContent = seatedCount + " seated card(s)" + (unassignedCount ? " • " + unassignedCount + " unassigned" : "");
     list.innerHTML = cards.map(function(card){ return cardHtml(card, s); }).join("");
     list.style.setProperty('--tc-cols', s.cols || 2);
+    list.classList.add("preview-row");
+    var perRow = s.cols || 2;
+    var remaining = Math.max(0, cards.length - perRow);
+    previewNote.textContent = remaining > 0
+      ? "Showing 1 row of " + perRow + " — " + remaining + " more card(s) will print. Click \u201cPrint seating cards\u201d to see the full set."
+      : "";
     previewSlot.innerHTML = cardHtml(cards[0], s);
   }
 
@@ -1531,6 +1632,12 @@
     document.getElementById("cardFont").value = s.font;
     document.getElementById("cardNameSize").value = s.nameSize;
     document.getElementById("cardNameSizeValue").textContent = s.nameSize + "px";
+    document.querySelectorAll(".size-quick").forEach(function(btn){
+      btn.classList.toggle("active", parseInt(btn.dataset.size,10) === s.nameSize);
+    });
+    document.getElementById("cardNameBold").classList.toggle("active", !!s.nameBold);
+    document.getElementById("cardNameItalic").classList.toggle("active", !!s.nameItalic);
+    document.getElementById("cardNameUnderline").classList.toggle("active", !!s.nameUnderline);
     document.getElementById("cardBg").value = s.bg;
     document.getElementById("cardText").value = s.text;
     document.getElementById("cardAccent").value = s.accent;
@@ -1541,6 +1648,13 @@
     document.getElementById("cardRadius").value = s.radius;
     document.getElementById("cardRadiusValue").textContent = s.radius + "px";
     document.getElementById("cardShowMeta").checked = !!s.showMeta;
+    document.getElementById("cardMessage").value = s.message || "";
+    document.getElementById("cardMessageFont").value = s.messageFont;
+    document.getElementById("cardMessageSize").value = s.messageSize;
+    document.getElementById("cardMessageSizeValue").textContent = s.messageSize + "px";
+    document.getElementById("cardMessageBold").classList.toggle("active", !!s.messageBold);
+    document.getElementById("cardMessageItalic").classList.toggle("active", !!s.messageItalic);
+    document.getElementById("cardMessageUnderline").classList.toggle("active", !!s.messageUnderline);
   }
 
   function wireCardBuilder(){
@@ -1548,6 +1662,12 @@
       fn(state.cardStyle);
       saveState();
       renderSeatingCards();
+    }
+    function wireToggle(id, prop){
+      document.getElementById(id).addEventListener("click", function(){
+        update(function(s){ s[prop] = !s[prop]; });
+        document.getElementById(id).classList.toggle("active", !!state.cardStyle[prop]);
+      });
     }
     document.getElementById("cardPreset").addEventListener("change", function(e){
       update(function(s){
@@ -1573,7 +1693,22 @@
     document.getElementById("cardNameSize").addEventListener("input", function(e){
       document.getElementById("cardNameSizeValue").textContent = e.target.value + "px";
       update(function(s){ s.nameSize = parseInt(e.target.value,10) || 24; });
+      document.querySelectorAll(".size-quick").forEach(function(btn){
+        btn.classList.toggle("active", parseInt(btn.dataset.size,10) === state.cardStyle.nameSize);
+      });
     });
+    document.querySelectorAll(".size-quick").forEach(function(btn){
+      btn.addEventListener("click", function(){
+        var size = parseInt(btn.dataset.size,10);
+        update(function(s){ s.nameSize = size; });
+        document.getElementById("cardNameSize").value = size;
+        document.getElementById("cardNameSizeValue").textContent = size + "px";
+        document.querySelectorAll(".size-quick").forEach(function(b){ b.classList.toggle("active", b === btn); });
+      });
+    });
+    wireToggle("cardNameBold", "nameBold");
+    wireToggle("cardNameItalic", "nameItalic");
+    wireToggle("cardNameUnderline", "nameUnderline");
     document.getElementById("cardBg").addEventListener("input", function(e){
       update(function(s){ s.bg = e.target.value; });
     });
@@ -1600,6 +1735,19 @@
     document.getElementById("cardShowMeta").addEventListener("change", function(e){
       update(function(s){ s.showMeta = e.target.checked; });
     });
+    document.getElementById("cardMessage").addEventListener("input", function(e){
+      update(function(s){ s.message = e.target.value; });
+    });
+    document.getElementById("cardMessageFont").addEventListener("change", function(e){
+      update(function(s){ s.messageFont = e.target.value; });
+    });
+    document.getElementById("cardMessageSize").addEventListener("input", function(e){
+      document.getElementById("cardMessageSizeValue").textContent = e.target.value + "px";
+      update(function(s){ s.messageSize = parseInt(e.target.value,10) || 12; });
+    });
+    wireToggle("cardMessageBold", "messageBold");
+    wireToggle("cardMessageItalic", "messageItalic");
+    wireToggle("cardMessageUnderline", "messageUnderline");
   }
 
   function escapeHtml(s){
