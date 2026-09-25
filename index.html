@@ -239,13 +239,37 @@
   @media (min-width: 560px) {
     .cards-grid { grid-template-columns: repeat(var(--tc-cols, 2), 1fr); }
   }
-  .cards-grid.preview-row {
-    grid-template-rows: 1fr;
-    grid-auto-rows: 0;
-    overflow: hidden;
-  }
   .cards-preview-note {
     color: var(--ink-soft); font-size: 12.5px; margin: 10px 2px 0;
+  }
+  .print-only-cards { display: none; }
+
+  /* ---- seating cards modal ---- */
+  .card-modal-backdrop {
+    display: none; position: fixed; inset: 0; z-index: 200;
+    background: rgba(20, 22, 32, 0.55);
+    align-items: flex-start; justify-content: center;
+    padding: 24px 16px; overflow-y: auto;
+  }
+  body.card-modal-open .card-modal-backdrop { display: flex; }
+  .card-modal-panel {
+    background: var(--panel); border-radius: 14px; border: 1px solid var(--line);
+    box-shadow: var(--shadow); width: 100%; max-width: 960px;
+    max-height: calc(100vh - 48px); display: flex; flex-direction: column; overflow: hidden;
+  }
+  .card-modal-head {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 16px 20px; border-bottom: 1px solid var(--line); flex: none;
+  }
+  .card-modal-head h2 { margin: 0; }
+  .card-modal-body { padding: 20px; overflow-y: auto; flex: 1 1 auto; }
+  .card-modal-foot {
+    display: flex; align-items: center; justify-content: flex-end; gap: 10px;
+    padding: 14px 20px; border-top: 1px solid var(--line); flex: none;
+  }
+  @media (max-width: 600px) {
+    .card-modal-backdrop { padding: 0; }
+    .card-modal-panel { max-width: none; max-height: 100vh; height: 100vh; border-radius: 0; }
   }
   .tent-card {
     position: relative;
@@ -329,15 +353,11 @@
     .canvas-wrap { overflow: visible; }
     .print-panel .tray { display: none !important; }
     body[data-print-mode="cards"] .print-floor-plan { display: none !important; }
-    body[data-print-mode="cards"] .print-cards-panel { display: block !important; }
-    body[data-print-mode="cards"] .card-builder,
-    body[data-print-mode="cards"] .print-cards-summary { display: none !important; }
+    body[data-print-mode="cards"] .print-cards-panel.print-only-cards { display: block !important; }
+    .card-modal-backdrop { display: none !important; }
     body[data-print-mode="cards"] .cards-grid {
       grid-template-columns: repeat(var(--tc-cols, 2), 1fr);
       gap: 0.25in;
-    }
-    body[data-print-mode="cards"] .cards-grid.preview-row {
-      grid-template-rows: none; grid-auto-rows: auto; overflow: visible;
     }
     .cards-preview-note { display: none !important; }
     body[data-print-mode="cards"] .tent-card {
@@ -446,7 +466,7 @@
       <button class="primary-cta" data-action="rearrange">Rearrange</button>
       <button class="ghost" data-action="clear-seating">Clear seats</button>
       <button class="ghost" data-action="print">Print chart</button>
-      <button class="ghost" data-action="print-cards">Print seating cards</button>
+      <button class="ghost" data-action="open-cards-modal">Design &amp; print seating cards</button>
       <div class="spacer"></div>
       <button class="ghost small" data-action="reset-all">Reset everything</button>
     </div>
@@ -471,133 +491,149 @@
       <div class="tray" id="trayList"></div>
     </section>
 
-    <section class="panel print-panel print-cards-panel">
+    <section class="panel print-panel print-cards-panel print-only-cards">
       <h2>Seating cards</h2>
-      <p class="print-cards-summary" id="seatingCardsSummary"></p>
+      <div class="cards-grid" id="seatingCardsListPrint"></div>
+    </section>
 
-      <div class="card-builder">
-        <div class="builder-fields">
-          <div class="builder-row">
-            <label><span class="lbl">Card size (preset)</span>
-              <select id="cardPreset">
-                <option value="avery5302">Avery 5302 — 4.25" × 5.5" (2/sheet)</option>
-                <option value="avery8315">Avery 8315 — 3.5" × 2" flat (10/sheet)</option>
-                <option value="custom">Custom size</option>
-              </select>
-            </label>
-            <label><span class="lbl">Cards per row (print)</span>
-              <input type="number" id="cardCols" min="1" max="4" value="2">
-            </label>
-          </div>
-          <div class="builder-row" id="cardCustomSizeRow" style="display:none">
-            <label><span class="lbl">Width (in)</span><input type="number" id="cardWidthIn" min="2" max="8.5" step="0.1" value="4.25"></label>
-            <label><span class="lbl">Height (in)</span><input type="number" id="cardHeightIn" min="2" max="11" step="0.1" value="5.5"></label>
-          </div>
-          <div class="builder-row">
-            <label><span class="lbl">Heading font</span>
-              <select id="cardFont">
-                <option value="Fraunces, serif">Fraunces (serif)</option>
-                <option value="'Playfair Display', serif">Playfair Display (serif)</option>
-                <option value="'Cormorant Garamond', serif">Cormorant Garamond (serif)</option>
-                <option value="'Libre Baskerville', serif">Libre Baskerville (serif)</option>
-                <option value="'Cinzel', serif">Cinzel (serif, elegant)</option>
-                <option value="'Great Vibes', cursive">Great Vibes (script)</option>
-                <option value="'Dancing Script', cursive">Dancing Script (script)</option>
-                <option value="'Parisienne', cursive">Parisienne (script)</option>
-                <option value="'Montserrat', sans-serif">Montserrat (sans)</option>
-                <option value="'Josefin Sans', sans-serif">Josefin Sans (sans)</option>
-                <option value="'IBM Plex Sans', sans-serif">IBM Plex Sans (sans)</option>
-              </select>
-            </label>
-          </div>
-          <div class="builder-row">
-            <label><span class="lbl">Name size</span>
-              <div class="size-quick-row">
-                <button type="button" class="ghost small size-quick" data-size="18">S</button>
-                <button type="button" class="ghost small size-quick" data-size="24">M</button>
-                <button type="button" class="ghost small size-quick" data-size="30">L</button>
-                <button type="button" class="ghost small size-quick" data-size="38">XL</button>
-              </div>
-            </label>
-            <label><span class="lbl">Fine-tune size</span>
-              <input type="range" id="cardNameSize" min="12" max="60" step="1" value="24">
-            </label>
-            <span class="swatch-value" id="cardNameSizeValue">24px</span>
-          </div>
-          <div class="builder-row">
-            <span class="lbl" style="flex:0 0 auto;">Name style</span>
-            <button type="button" class="ghost small rich-toggle" id="cardNameBold" title="Bold"><b>B</b></button>
-            <button type="button" class="ghost small rich-toggle" id="cardNameItalic" title="Italic"><i>I</i></button>
-            <button type="button" class="ghost small rich-toggle" id="cardNameUnderline" title="Underline"><u>U</u></button>
-          </div>
-          <div class="builder-row">
-            <label><span class="lbl">Background</span><input type="color" id="cardBg" value="#ffffff"></label>
-            <label><span class="lbl">Text color</span><input type="color" id="cardText" value="#23283b"></label>
-            <label><span class="lbl">Accent color</span><input type="color" id="cardAccent" value="#a97d3f"></label>
-          </div>
-          <div class="builder-row">
-            <label><span class="lbl">Border style</span>
-              <select id="cardBorderStyle">
-                <option value="solid">Solid</option>
-                <option value="dashed">Dashed</option>
-                <option value="dotted">Dotted</option>
-                <option value="double">Double</option>
-                <option value="none">None</option>
-              </select>
-            </label>
-            <label><span class="lbl">Border color</span><input type="color" id="cardBorderColor" value="#e4dbc4"></label>
-            <label><span class="lbl">Border width</span>
-              <input type="range" id="cardBorderWidth" min="0" max="6" step="0.5" value="1.5">
-            </label>
-            <span class="swatch-value" id="cardBorderWidthValue">1.5px</span>
-          </div>
-          <div class="builder-row">
-            <label><span class="lbl">Corner radius</span>
-              <input type="range" id="cardRadius" min="0" max="40" step="1" value="10">
-            </label>
-            <span class="swatch-value" id="cardRadiusValue">10px</span>
-            <label class="check"><input type="checkbox" id="cardShowMeta" checked> show table/seat details</label>
-          </div>
-          <div class="builder-row">
-            <label style="flex:1 1 100%;"><span class="lbl">Custom message (optional, e.g. a quote or thank-you line)</span>
-              <input type="text" id="cardMessage" maxlength="80" placeholder="e.g. Thank you for celebrating with us!">
-            </label>
-          </div>
-          <div class="builder-row">
-            <label><span class="lbl">Message font</span>
-              <select id="cardMessageFont">
-                <option value="'IBM Plex Sans', sans-serif">IBM Plex Sans (sans)</option>
-                <option value="'Montserrat', sans-serif">Montserrat (sans)</option>
-                <option value="'Josefin Sans', sans-serif">Josefin Sans (sans)</option>
-                <option value="Fraunces, serif">Fraunces (serif)</option>
-                <option value="'Cormorant Garamond', serif">Cormorant Garamond (serif)</option>
-                <option value="'Great Vibes', cursive">Great Vibes (script)</option>
-                <option value="'Dancing Script', cursive">Dancing Script (script)</option>
-              </select>
-            </label>
-            <label><span class="lbl">Message size</span>
-              <input type="range" id="cardMessageSize" min="9" max="24" step="1" value="12">
-            </label>
-            <span class="swatch-value" id="cardMessageSizeValue">12px</span>
-          </div>
-          <div class="builder-row">
-            <span class="lbl" style="flex:0 0 auto;">Message style</span>
-            <button type="button" class="ghost small rich-toggle" id="cardMessageBold" title="Bold"><b>B</b></button>
-            <button type="button" class="ghost small rich-toggle" id="cardMessageItalic" title="Italic"><i>I</i></button>
-            <button type="button" class="ghost small rich-toggle" id="cardMessageUnderline" title="Underline"><u>U</u></button>
-          </div>
-          <div class="builder-row">
-            <button type="button" class="ghost small" data-action="reset-card-style">Reset to default style</button>
-          </div>
+    <div class="card-modal-backdrop" id="cardModalBackdrop">
+      <div class="card-modal-panel">
+        <div class="card-modal-head">
+          <h2>Design &amp; print seating cards</h2>
+          <button type="button" class="ghost small" data-action="close-cards-modal" aria-label="Close">✕ Close</button>
         </div>
-        <div class="builder-preview-wrap">
-          <div class="cards-grid" id="cardPreviewSlot" style="grid-template-columns: 1fr; max-width: 260px;"></div>
+        <div class="card-modal-body">
+          <p class="print-cards-summary" id="seatingCardsSummary"></p>
+
+          <div class="card-builder">
+            <div class="builder-fields">
+              <div class="builder-row">
+                <label><span class="lbl">Card size (preset)</span>
+                  <select id="cardPreset">
+                    <option value="avery5302">Avery 5302 — 4.25" × 5.5" (2/sheet)</option>
+                    <option value="avery8315">Avery 8315 — 3.5" × 2" flat (10/sheet)</option>
+                    <option value="custom">Custom size</option>
+                  </select>
+                </label>
+                <label><span class="lbl">Cards per row (print)</span>
+                  <input type="number" id="cardCols" min="1" max="4" value="2">
+                </label>
+              </div>
+              <div class="builder-row" id="cardCustomSizeRow" style="display:none">
+                <label><span class="lbl">Width (in)</span><input type="number" id="cardWidthIn" min="2" max="8.5" step="0.1" value="4.25"></label>
+                <label><span class="lbl">Height (in)</span><input type="number" id="cardHeightIn" min="2" max="11" step="0.1" value="5.5"></label>
+              </div>
+              <div class="builder-row">
+                <label><span class="lbl">Heading font</span>
+                  <select id="cardFont">
+                    <option value="Fraunces, serif">Fraunces (serif)</option>
+                    <option value="'Playfair Display', serif">Playfair Display (serif)</option>
+                    <option value="'Cormorant Garamond', serif">Cormorant Garamond (serif)</option>
+                    <option value="'Libre Baskerville', serif">Libre Baskerville (serif)</option>
+                    <option value="'Cinzel', serif">Cinzel (serif, elegant)</option>
+                    <option value="'Great Vibes', cursive">Great Vibes (script)</option>
+                    <option value="'Dancing Script', cursive">Dancing Script (script)</option>
+                    <option value="'Parisienne', cursive">Parisienne (script)</option>
+                    <option value="'Montserrat', sans-serif">Montserrat (sans)</option>
+                    <option value="'Josefin Sans', sans-serif">Josefin Sans (sans)</option>
+                    <option value="'IBM Plex Sans', sans-serif">IBM Plex Sans (sans)</option>
+                  </select>
+                </label>
+              </div>
+              <div class="builder-row">
+                <label><span class="lbl">Name size</span>
+                  <div class="size-quick-row">
+                    <button type="button" class="ghost small size-quick" data-size="18">S</button>
+                    <button type="button" class="ghost small size-quick" data-size="24">M</button>
+                    <button type="button" class="ghost small size-quick" data-size="30">L</button>
+                    <button type="button" class="ghost small size-quick" data-size="38">XL</button>
+                  </div>
+                </label>
+                <label><span class="lbl">Fine-tune size</span>
+                  <input type="range" id="cardNameSize" min="12" max="60" step="1" value="24">
+                </label>
+                <span class="swatch-value" id="cardNameSizeValue">24px</span>
+              </div>
+              <div class="builder-row">
+                <span class="lbl" style="flex:0 0 auto;">Name style</span>
+                <button type="button" class="ghost small rich-toggle" id="cardNameBold" title="Bold"><b>B</b></button>
+                <button type="button" class="ghost small rich-toggle" id="cardNameItalic" title="Italic"><i>I</i></button>
+                <button type="button" class="ghost small rich-toggle" id="cardNameUnderline" title="Underline"><u>U</u></button>
+              </div>
+              <div class="builder-row">
+                <label><span class="lbl">Background</span><input type="color" id="cardBg" value="#ffffff"></label>
+                <label><span class="lbl">Text color</span><input type="color" id="cardText" value="#23283b"></label>
+                <label><span class="lbl">Accent color</span><input type="color" id="cardAccent" value="#a97d3f"></label>
+              </div>
+              <div class="builder-row">
+                <label><span class="lbl">Border style</span>
+                  <select id="cardBorderStyle">
+                    <option value="solid">Solid</option>
+                    <option value="dashed">Dashed</option>
+                    <option value="dotted">Dotted</option>
+                    <option value="double">Double</option>
+                    <option value="none">None</option>
+                  </select>
+                </label>
+                <label><span class="lbl">Border color</span><input type="color" id="cardBorderColor" value="#e4dbc4"></label>
+                <label><span class="lbl">Border width</span>
+                  <input type="range" id="cardBorderWidth" min="0" max="6" step="0.5" value="1.5">
+                </label>
+                <span class="swatch-value" id="cardBorderWidthValue">1.5px</span>
+              </div>
+              <div class="builder-row">
+                <label><span class="lbl">Corner radius</span>
+                  <input type="range" id="cardRadius" min="0" max="40" step="1" value="10">
+                </label>
+                <span class="swatch-value" id="cardRadiusValue">10px</span>
+                <label class="check"><input type="checkbox" id="cardShowMeta" checked> show table/seat details</label>
+              </div>
+              <div class="builder-row">
+                <label style="flex:1 1 100%;"><span class="lbl">Custom message (optional, e.g. a quote or thank-you line)</span>
+                  <input type="text" id="cardMessage" maxlength="80" placeholder="e.g. Thank you for celebrating with us!">
+                </label>
+              </div>
+              <div class="builder-row">
+                <label><span class="lbl">Message font</span>
+                  <select id="cardMessageFont">
+                    <option value="'IBM Plex Sans', sans-serif">IBM Plex Sans (sans)</option>
+                    <option value="'Montserrat', sans-serif">Montserrat (sans)</option>
+                    <option value="'Josefin Sans', sans-serif">Josefin Sans (sans)</option>
+                    <option value="Fraunces, serif">Fraunces (serif)</option>
+                    <option value="'Cormorant Garamond', serif">Cormorant Garamond (serif)</option>
+                    <option value="'Great Vibes', cursive">Great Vibes (script)</option>
+                    <option value="'Dancing Script', cursive">Dancing Script (script)</option>
+                  </select>
+                </label>
+                <label><span class="lbl">Message size</span>
+                  <input type="range" id="cardMessageSize" min="9" max="24" step="1" value="12">
+                </label>
+                <span class="swatch-value" id="cardMessageSizeValue">12px</span>
+              </div>
+              <div class="builder-row">
+                <span class="lbl" style="flex:0 0 auto;">Message style</span>
+                <button type="button" class="ghost small rich-toggle" id="cardMessageBold" title="Bold"><b>B</b></button>
+                <button type="button" class="ghost small rich-toggle" id="cardMessageItalic" title="Italic"><i>I</i></button>
+                <button type="button" class="ghost small rich-toggle" id="cardMessageUnderline" title="Underline"><u>U</u></button>
+              </div>
+              <div class="builder-row">
+                <button type="button" class="ghost small" data-action="reset-card-style">Reset to default style</button>
+              </div>
+            </div>
+            <div class="builder-preview-wrap">
+              <div class="cards-grid" id="cardPreviewSlot" style="grid-template-columns: 1fr; max-width: 260px;"></div>
+            </div>
+          </div>
+
+          <div class="cards-grid screen-only-row" id="seatingCardsList"></div>
+          <p class="cards-preview-note" id="cardsPreviewNote"></p>
+        </div>
+        <div class="card-modal-foot">
+          <button type="button" class="ghost" data-action="close-cards-modal">Close</button>
+          <button type="button" class="primary-cta" data-action="print-cards">Print seating cards</button>
         </div>
       </div>
-
-      <div class="cards-grid" id="seatingCardsList"></div>
-      <p class="cards-preview-note" id="cardsPreviewNote"></p>
-    </section>
+    </div>
 
     <section class="panel">
       <h2>How the plan is doing</h2>
@@ -714,6 +750,12 @@
     document.addEventListener("dragover", handleDragOver);
     document.addEventListener("drop", handleDrop);
     window.addEventListener("afterprint", clearPrintMode);
+    document.getElementById("cardModalBackdrop").addEventListener("click", function(e){
+      if(e.target.id === "cardModalBackdrop") closeCardsModal();
+    });
+    document.addEventListener("keydown", function(e){
+      if(e.key === "Escape" && document.body.classList.contains("card-modal-open")) closeCardsModal();
+    });
     render();
   }
 
@@ -1128,6 +1170,8 @@
     }
     if(action === "print"){ setPrintMode("chart"); window.print(); return; }
     if(action === "print-cards"){ setPrintMode("cards"); window.print(); return; }
+    if(action === "open-cards-modal"){ openCardsModal(); return; }
+    if(action === "close-cards-modal"){ closeCardsModal(); return; }
     if(action === "reset-card-style"){
       state.cardStyle = defaultCardStyle();
       saveState(); render();
@@ -1419,6 +1463,15 @@
     document.body.removeAttribute("data-print-mode");
   }
 
+  function openCardsModal(){
+    document.body.classList.add("card-modal-open");
+    renderSeatingCards();
+  }
+
+  function closeCardsModal(){
+    document.body.classList.remove("card-modal-open");
+  }
+
   function renderWarning(){
     var el = document.getElementById("warningBanner");
     el.innerHTML = lastWarning ? '<div class="warning-banner">' + escapeHtml(lastWarning) + '</div>' : "";
@@ -1592,6 +1645,7 @@
 
   function renderSeatingCards(){
     var list = document.getElementById("seatingCardsList");
+    var printList = document.getElementById("seatingCardsListPrint");
     var summary = document.getElementById("seatingCardsSummary");
     var previewSlot = document.getElementById("cardPreviewSlot");
     var previewNote = document.getElementById("cardsPreviewNote");
@@ -1601,7 +1655,7 @@
 
     if(cards.length === 0){
       list.innerHTML = '<div class="empty-note">No guests yet — add guests before printing cards.</div>';
-      list.classList.remove("preview-row");
+      printList.innerHTML = "";
       summary.textContent = "";
       previewNote.textContent = "";
       previewSlot.innerHTML = cardHtml({guest:{name:"Sample Guest", kid:false}, table:{name:"Table 1"}, idx:1, seated:true}, s);
@@ -1611,13 +1665,18 @@
     var seatedCount = cards.filter(function(card){ return card.seated; }).length;
     var unassignedCount = cards.length - seatedCount;
     summary.textContent = seatedCount + " seated card(s)" + (unassignedCount ? " • " + unassignedCount + " unassigned" : "");
-    list.innerHTML = cards.map(function(card){ return cardHtml(card, s); }).join("");
-    list.style.setProperty('--tc-cols', s.cols || 2);
-    list.classList.add("preview-row");
+
     var perRow = s.cols || 2;
+    var rowCards = cards.slice(0, perRow);
+    list.innerHTML = rowCards.map(function(card){ return cardHtml(card, s); }).join("");
+    list.style.setProperty('--tc-cols', perRow);
+
+    printList.innerHTML = cards.map(function(card){ return cardHtml(card, s); }).join("");
+    printList.style.setProperty('--tc-cols', perRow);
+
     var remaining = Math.max(0, cards.length - perRow);
     previewNote.textContent = remaining > 0
-      ? "Showing 1 row of " + perRow + " — " + remaining + " more card(s) will print. Click \u201cPrint seating cards\u201d to see the full set."
+      ? "Showing 1 row of " + rowCards.length + " — " + remaining + " more card(s) will print. Click \u201cPrint seating cards\u201d to see the full set."
       : "";
     previewSlot.innerHTML = cardHtml(cards[0], s);
   }
